@@ -725,7 +725,7 @@ class BriefVersionManager:
             ) VALUES (
                 :log_uuid, :brief_id, :from_version, :to_version,
                 :from_uuid, :to_uuid, :event_type, :trigger_code,
-                :trigger_reason, :actor, :diff_json::jsonb,
+                :trigger_reason, :actor, CAST(:diff_json AS jsonb),
                 :rollback_source_uuid, :created_at
             )
             """),
@@ -983,11 +983,11 @@ class BriefVersionManager:
             :brief_uuid, :brief_id, :version,
             :parent_version_id, :rollback_source_uuid,
             :is_latest_version, :is_superseded, :ab_variant,
-            :brief_json::jsonb, :change_log::jsonb,
+            CAST(:brief_json AS jsonb), CAST(:change_log AS jsonb),
             :idea_id, :platform,
             :hook, :primary_emotion, :story_structure, :scene_count,
             :duration_sec, :visual_style, :camera_style, :audio_style,
-            :cta_style, :platform_format::jsonb,
+            :cta_style, CAST(:platform_format AS jsonb),
             :production_complexity, :production_risk,
             :validation_status, :approval_status, :production_blocked,
             :revision_reason, :compliance_note, :schema_version,
