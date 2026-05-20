@@ -475,7 +475,7 @@ class BriefVersionManager:
         if row is None:
             raise BriefNotFoundError(f"Brief {brief_uuid} nicht gefunden.")
 
-        row = dict(row)
+        row = dict(row._mapping)
 
         if row["is_final"]:
             raise BriefFinalError(
@@ -570,7 +570,7 @@ class BriefVersionManager:
         if row is None:
             return None
 
-        return ContentBriefRecord.model_validate(dict(row))
+        return ContentBriefRecord.model_validate(dict(row._mapping))
 
     def get_by_uuid(self, brief_uuid: UUID) -> ContentBriefRecord:
         """Lädt eine spezifische Version per UUID."""
@@ -585,7 +585,7 @@ class BriefVersionManager:
         if row is None:
             raise BriefNotFoundError(f"Brief {brief_uuid} nicht gefunden.")
 
-        return ContentBriefRecord.model_validate(dict(row))
+        return ContentBriefRecord.model_validate(dict(row._mapping))
 
     # ─────────────────────────────────────────────────────────────────────────
     # Diff + Extraktion
@@ -687,7 +687,7 @@ class BriefVersionManager:
             raise BriefNotFoundError(
                 f"Brief '{brief_id}' nicht gefunden oder bereits gelöscht."
             )
-        return dict(row)
+        return dict(row._mapping)
 
     def _load_record(self, brief_uuid_str: str) -> ContentBriefRecord:
         row = self._db.execute(
@@ -696,7 +696,7 @@ class BriefVersionManager:
         ).fetchone()
         if row is None:
             raise BriefNotFoundError(f"Neu erstellte Version {brief_uuid_str} nicht gefunden.")
-        return ContentBriefRecord.model_validate(dict(row))
+        return ContentBriefRecord.model_validate(dict(row._mapping))
 
     def _insert_change_log(
         self,
