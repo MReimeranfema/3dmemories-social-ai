@@ -30,6 +30,7 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 from uuid import UUID, uuid4
 
+from sqlalchemy import text
 import structlog
 
 from app.models.content_brief import ContentBriefRecord
@@ -177,7 +178,7 @@ class BriefVersionManager:
             )
 
             self._db.execute(
-                self._INSERT_SQL,
+                text(self._INSERT_SQL),
                 {
                     "brief_uuid":             str(new_uuid),
                     "brief_id":               req.brief_id,
@@ -216,7 +217,7 @@ class BriefVersionManager:
 
             # Schritt 4: Vorgänger zurückstufen
             self._db.execute(
-                """
+                text("""
                 UPDATE content_briefs
                 SET is_latest_version = FALSE,
                     is_superseded     = TRUE,
@@ -226,7 +227,7 @@ class BriefVersionManager:
                     END,
                     updated_at = NOW()
                 WHERE brief_uuid = :parent_uuid
-                """,
+                """),
                 {"parent_uuid": str(current["brief_uuid"])},
             )
 
@@ -315,7 +316,7 @@ class BriefVersionManager:
 
         try:
             self._db.execute(
-                self._INSERT_SQL,
+                text(self._INSERT_SQL),
                 {
                     "brief_uuid":             str(new_uuid),
                     "brief_id":               brief_id,
@@ -398,11 +399,11 @@ class BriefVersionManager:
 
         # Zielversion laden
         target_row = self._db.execute(
-            """
+            text("""
             SELECT brief_uuid, brief_id, brief_json, version, is_final, is_deleted
             FROM content_briefs
             WHERE brief_uuid = :uuid
-            """,
+            """),
             {"uuid": str(target_uuid)},
         ).fetchone()
 
@@ -467,7 +468,7 @@ class BriefVersionManager:
             raise BriefVersionError("Archive erfordert DB-Verbindung.")
 
         row = self._db.execute(
-            "SELECT brief_uuid, brief_id, version, is_final FROM content_briefs WHERE brief_uuid = :uuid",
+            text("SELECT brief_uuid, brief_id, version, is_final FROM content_briefs WHERE brief_uuid = :uuid"),
             {"uuid": str(brief_uuid)},
         ).fetchone()
 
@@ -484,7 +485,7 @@ class BriefVersionManager:
         now = datetime.now(timezone.utc)
 
         self._db.execute(
-            """
+            text("""
             UPDATE content_briefs
             SET archived           = TRUE,
                 archived_at        = :now,
@@ -497,7 +498,7 @@ class BriefVersionManager:
                 updated_at = :now
             WHERE brief_uuid = :uuid
               AND is_final   = FALSE
-            """,
+            """),
             {"uuid": str(brief_uuid), "reason": reason, "now": now.isoformat()},
         )
         self._db.commit()
@@ -534,11 +535,11 @@ class BriefVersionManager:
             return []
 
         rows = self._db.execute(
-            """
+            text("""
             SELECT * FROM content_briefs
             WHERE brief_id = :brief_id
             ORDER BY version ASC
-            """,
+            """),
             {"brief_id": brief_id},
         ).fetchall()
 
@@ -556,13 +557,13 @@ class BriefVersionManager:
             return None
 
         row = self._db.execute(
-            """
+            text("""
             SELECT * FROM content_briefs
             WHERE brief_id         = :brief_id
               AND is_latest_version = TRUE
               AND is_deleted        = FALSE
             LIMIT 1
-            """,
+            """),
             {"brief_id": brief_id},
         ).fetchone()
 
@@ -577,7 +578,7 @@ class BriefVersionManager:
             raise BriefVersionError("get_by_uuid erfordert DB-Verbindung.")
 
         row = self._db.execute(
-            "SELECT * FROM content_briefs WHERE brief_uuid = :uuid",
+            text("SELECT * FROM content_briefs WHERE brief_uuid = :uuid"),
             {"uuid": str(brief_uuid)},
         ).fetchone()
 
@@ -671,14 +672,14 @@ class BriefVersionManager:
     def _load_latest_for_update(self, brief_id: str) -> dict:
         """Lädt aktuelle Version mit SELECT ... FOR UPDATE."""
         row = self._db.execute(
-            """
+            text("""
             SELECT *
             FROM content_briefs
             WHERE brief_id         = :brief_id
               AND is_latest_version = TRUE
               AND is_deleted        = FALSE
             FOR UPDATE
-            """,
+            """),
             {"brief_id": brief_id},
         ).fetchone()
 
@@ -690,7 +691,7 @@ class BriefVersionManager:
 
     def _load_record(self, brief_uuid_str: str) -> ContentBriefRecord:
         row = self._db.execute(
-            "SELECT * FROM content_briefs WHERE brief_uuid = :uuid",
+            text("SELECT * FROM content_briefs WHERE brief_uuid = :uuid"),
             {"uuid": brief_uuid_str},
         ).fetchone()
         if row is None:
@@ -715,7 +716,7 @@ class BriefVersionManager:
         if self._db is None:
             return
         self._db.execute(
-            """
+            text("""
             INSERT INTO content_brief_change_log (
                 log_uuid, brief_id, from_version, to_version,
                 from_uuid, to_uuid, event_type, trigger_code,
@@ -727,7 +728,7 @@ class BriefVersionManager:
                 :trigger_reason, :actor, :diff_json::jsonb,
                 :rollback_source_uuid, :created_at
             )
-            """,
+            """),
             {
                 "log_uuid":             str(uuid4()),
                 "brief_id":             brief_id,
