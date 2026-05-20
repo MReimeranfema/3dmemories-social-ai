@@ -151,114 +151,114 @@ class BriefVersionManager:
             # Schritt 1: Aktuelle Version laden + locken
             current = self._load_latest_for_update(req.brief_id)
 
-                # Schritt 2: FINAL-Check
-                if current["is_final"]:
-                    raise BriefFinalError(
-                        f"Brief {req.brief_id} v{current['version']} ist FINAL — "
-                        "keine neue Version möglich."
-                    )
-
-                # Schritt 3: Neue Version INSERT
-                new_uuid    = uuid4()
-                new_version = current["version"] + 1
-                now         = datetime.now(timezone.utc)
-
-                denorm = self._extract_denormalized_fields(req.new_brief_json)
-                diff   = self._compute_diff(
-                    current.get("brief_json", {}), req.new_brief_json
-                )
-                change_log_entry = self._build_change_log_entry(
-                    version=new_version,
-                    trigger_code=req.trigger_code,
-                    revision_reason=req.revision_reason,
-                    actor=req.actor,
-                    diff=diff,
-                    timestamp=now,
+            # Schritt 2: FINAL-Check
+            if current["is_final"]:
+                raise BriefFinalError(
+                    f"Brief {req.brief_id} v{current['version']} ist FINAL — "
+                    "keine neue Version möglich."
                 )
 
-                self._db.execute(
-                    self._INSERT_SQL,
-                    {
-                        "brief_uuid":             str(new_uuid),
-                        "brief_id":               req.brief_id,
-                        "version":                new_version,
-                        "parent_version_id":      str(current["brief_uuid"]),
-                        "rollback_source_uuid":   str(req.rollback_source_uuid) if req.rollback_source_uuid else None,
-                        "is_latest_version":      True,
-                        "is_superseded":          False,
-                        "ab_variant":             req.ab_variant,
-                        "brief_json":             json.dumps(req.new_brief_json, ensure_ascii=False),
-                        "change_log":             json.dumps([change_log_entry], ensure_ascii=False),
-                        "idea_id":                current.get("idea_id"),
-                        "platform":               denorm.get("platform") or current.get("platform"),
-                        "hook":                   denorm.get("hook"),
-                        "primary_emotion":        denorm.get("primary_emotion"),
-                        "story_structure":        denorm.get("story_structure"),
-                        "scene_count":            denorm.get("scene_count"),
-                        "duration_sec":           denorm.get("duration_sec"),
-                        "visual_style":           denorm.get("visual_style"),
-                        "camera_style":           denorm.get("camera_style"),
-                        "audio_style":            denorm.get("audio_style"),
-                        "cta_style":              denorm.get("cta_style"),
-                        "platform_format":        json.dumps(denorm.get("platform_format")) if denorm.get("platform_format") else None,
-                        "production_complexity":  denorm.get("production_complexity"),
-                        "production_risk":        denorm.get("production_risk"),
-                        "validation_status":      "pending",
-                        "approval_status":        "PENDING_VALIDATION",
-                        "production_blocked":     True,
-                        "revision_reason":        req.revision_reason,
-                        "compliance_note":        req.compliance_note,
-                        "schema_version":         req.schema_version,
-                        "created_by_agent":       req.actor,
-                        "created_at":             now.isoformat(),
-                    }
-                )
+            # Schritt 3: Neue Version INSERT
+            new_uuid    = uuid4()
+            new_version = current["version"] + 1
+            now         = datetime.now(timezone.utc)
 
-                # Schritt 4: Vorgänger zurückstufen
-                self._db.execute(
-                    """
-                    UPDATE content_briefs
-                    SET is_latest_version = FALSE,
-                        is_superseded     = TRUE,
-                        approval_status   = CASE
-                            WHEN approval_status = 'APPROVED' THEN 'SUPERSEDED'
-                            ELSE approval_status
-                        END,
-                        updated_at = NOW()
-                    WHERE brief_uuid = :parent_uuid
-                    """,
-                    {"parent_uuid": str(current["brief_uuid"])},
-                )
+            denorm = self._extract_denormalized_fields(req.new_brief_json)
+            diff   = self._compute_diff(
+                current.get("brief_json", {}), req.new_brief_json
+            )
+            change_log_entry = self._build_change_log_entry(
+                version=new_version,
+                trigger_code=req.trigger_code,
+                revision_reason=req.revision_reason,
+                actor=req.actor,
+                diff=diff,
+                timestamp=now,
+            )
 
-                # Schritt 5: Change-Log-Tabelle
-                self._insert_change_log(
-                    brief_id=req.brief_id,
-                    from_version=current["version"],
-                    to_version=new_version,
-                    from_uuid=current["brief_uuid"],
-                    to_uuid=new_uuid,
-                    event_type="REVISION" if new_version > 1 else "BRIEF_CREATED",
-                    trigger_code=req.trigger_code,
-                    trigger_reason=req.revision_reason,
-                    actor=req.actor,
-                    diff_json=diff,
-                    rollback_source_uuid=req.rollback_source_uuid,
-                    created_at=now,
-                )
+            self._db.execute(
+                self._INSERT_SQL,
+                {
+                    "brief_uuid":             str(new_uuid),
+                    "brief_id":               req.brief_id,
+                    "version":                new_version,
+                    "parent_version_id":      str(current["brief_uuid"]),
+                    "rollback_source_uuid":   str(req.rollback_source_uuid) if req.rollback_source_uuid else None,
+                    "is_latest_version":      True,
+                    "is_superseded":          False,
+                    "ab_variant":             req.ab_variant,
+                    "brief_json":             json.dumps(req.new_brief_json, ensure_ascii=False),
+                    "change_log":             json.dumps([change_log_entry], ensure_ascii=False),
+                    "idea_id":                current.get("idea_id"),
+                    "platform":               denorm.get("platform") or current.get("platform"),
+                    "hook":                   denorm.get("hook"),
+                    "primary_emotion":        denorm.get("primary_emotion"),
+                    "story_structure":        denorm.get("story_structure"),
+                    "scene_count":            denorm.get("scene_count"),
+                    "duration_sec":           denorm.get("duration_sec"),
+                    "visual_style":           denorm.get("visual_style"),
+                    "camera_style":           denorm.get("camera_style"),
+                    "audio_style":            denorm.get("audio_style"),
+                    "cta_style":              denorm.get("cta_style"),
+                    "platform_format":        json.dumps(denorm.get("platform_format")) if denorm.get("platform_format") else None,
+                    "production_complexity":  denorm.get("production_complexity"),
+                    "production_risk":        denorm.get("production_risk"),
+                    "validation_status":      "pending",
+                    "approval_status":        "PENDING_VALIDATION",
+                    "production_blocked":     True,
+                    "revision_reason":        req.revision_reason,
+                    "compliance_note":        req.compliance_note,
+                    "schema_version":         req.schema_version,
+                    "created_by_agent":       req.actor,
+                    "created_at":             now.isoformat(),
+                }
+            )
 
-                # Schritt 6: Google Sheets
-                self._log_to_sheets(
-                    brief_id=req.brief_id,
-                    version=new_version,
-                    brief_uuid=new_uuid,
-                    event="REVISION" if new_version > 1 else "BRIEF_CREATED",
-                    trigger=req.trigger_code,
-                    trigger_reason=req.revision_reason,
-                    actor=req.actor,
-                    platform=denorm.get("platform") or current.get("platform", "?"),
-                    diff=diff,
-                    timestamp=now,
-                )
+            # Schritt 4: Vorgänger zurückstufen
+            self._db.execute(
+                """
+                UPDATE content_briefs
+                SET is_latest_version = FALSE,
+                    is_superseded     = TRUE,
+                    approval_status   = CASE
+                        WHEN approval_status = 'APPROVED' THEN 'SUPERSEDED'
+                        ELSE approval_status
+                    END,
+                    updated_at = NOW()
+                WHERE brief_uuid = :parent_uuid
+                """,
+                {"parent_uuid": str(current["brief_uuid"])},
+            )
+
+            # Schritt 5: Change-Log-Tabelle
+            self._insert_change_log(
+                brief_id=req.brief_id,
+                from_version=current["version"],
+                to_version=new_version,
+                from_uuid=current["brief_uuid"],
+                to_uuid=new_uuid,
+                event_type="REVISION" if new_version > 1 else "BRIEF_CREATED",
+                trigger_code=req.trigger_code,
+                trigger_reason=req.revision_reason,
+                actor=req.actor,
+                diff_json=diff,
+                rollback_source_uuid=req.rollback_source_uuid,
+                created_at=now,
+            )
+
+            # Schritt 6: Google Sheets
+            self._log_to_sheets(
+                brief_id=req.brief_id,
+                version=new_version,
+                brief_uuid=new_uuid,
+                event="REVISION" if new_version > 1 else "BRIEF_CREATED",
+                trigger=req.trigger_code,
+                trigger_reason=req.revision_reason,
+                actor=req.actor,
+                platform=denorm.get("platform") or current.get("platform", "?"),
+                diff=diff,
+                timestamp=now,
+            )
 
             self._db.commit()
 
