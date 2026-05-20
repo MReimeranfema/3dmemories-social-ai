@@ -359,7 +359,7 @@ class BriefEngine:
                     idea_id=idea.get("idea_id"),
                 )
 
-                response = self._claude.call(
+                response = self._claude.complete(
                     ClaudeCallParams(
                         system_prompt=SYSTEM_PROMPT,
                         user_prompt=prompt,
