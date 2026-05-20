@@ -1185,7 +1185,7 @@ BEREITS VERWENDETE IDEEN-IDs (nicht wiederholen, ähnliche Hooks vermeiden):
                 system_prompt=system_prompt,
                 user_prompt=user_prompt,
                 model=model,
-                max_tokens=3000,
+                max_tokens=8000,
             ))
 
         return _do()
