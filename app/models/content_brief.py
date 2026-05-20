@@ -18,7 +18,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import (
     Boolean, Column, DateTime, ForeignKey,
     Index, Integer, Numeric, String, Text, UniqueConstraint,
@@ -221,6 +221,12 @@ class ContentBriefRecord(BaseModel):
     updated_at:       datetime | None
 
     model_config = {"from_attributes": True}
+
+    @field_validator("change_log", "validation_errors", "validation_warnings", mode="before")
+    @classmethod
+    def none_to_empty_list(cls, v):
+        """NULL-Werte aus der DB werden zu leeren Listen normalisiert."""
+        return v if v is not None else []
 
     @property
     def can_create_new_version(self) -> bool:
