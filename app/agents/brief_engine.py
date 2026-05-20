@@ -475,8 +475,9 @@ class BriefEngine:
                 },
             ]
 
-            self._slack_client.post_blocks(
+            self._slack_client.post_message(
                 channel=settings.SLACK_CHANNEL_IMAGE_REVIEW,
+                text=f"Neuer Brief: {record.brief_id} — {idea.get('title', '')}",
                 blocks=blocks,
             )
 
