@@ -3,6 +3,6 @@ builder = "dockerfile"
 dockerfilePath = "Dockerfile"
 
 [deploy]
-startCommand = "celery -A app.celery_app worker --loglevel=info"
+startCommand = "celery -A app.workers.celery_app worker --loglevel=info"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
