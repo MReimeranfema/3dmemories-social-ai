@@ -369,7 +369,7 @@ class BriefEngine:
                     )
                 )
 
-                raw_text   = response.content
+                raw_text   = response.text
                 brief_json = _extract_json(raw_text)
                 missing    = _validate_brief_schema(brief_json)
 
