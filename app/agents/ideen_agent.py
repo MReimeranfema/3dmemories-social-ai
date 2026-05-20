@@ -365,7 +365,14 @@ class IdeenAgent:
         self._log_to_sheets(idea_id=idea_id, status="IDEA_APPROVED", user=user_id)
 
         log.info("ideen_agent.approve.done", idea_id=idea_id)
-        # TODO: Orchestrator-Celery-Task starten → Brief-Erstellung
+
+        # Brief-Generierung als Celery-Task starten
+        try:
+            from app.workers.tasks import generate_brief
+            generate_brief.delay(idea_id=idea_id, channel=channel)
+            log.info("ideen_agent.approve.brief_task_queued", idea_id=idea_id)
+        except Exception as exc:
+            log.error("ideen_agent.approve.brief_task_failed", idea_id=idea_id, error=str(exc))
 
     def handle_reject(
         self,

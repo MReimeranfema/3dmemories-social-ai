@@ -244,3 +244,80 @@ def handle_reject_idea(
     except Exception as exc:
         log.error("task.handle_reject_idea.failed", idea_id=idea_id, error=str(exc))
         raise self.retry(exc=exc, countdown=10)
+
+
+# ── Task: Brief generieren ─────────────────────────────────────────────────────
+
+@celery_app.task(
+    bind=True,
+    name="app.workers.tasks.generate_brief",
+    queue="default",
+    max_retries=2,
+    default_retry_delay=30,
+)
+def generate_brief(
+    self,
+    idea_id: str,
+    channel: str = "",
+) -> dict:
+    """
+    Startet die BriefEngine für eine freigegebene Idee.
+
+    Wird aufgerufen durch:
+      - IdeenAgent.handle_approve() → direkt nach Freigabe
+
+    Args:
+        idea_id: ID der freigegebenen Idee (z.B. '3DM-2026-001')
+        channel: Slack-Channel für Brief-Output
+
+    Returns:
+        Dict mit brief_id und Status
+    """
+    log.info(
+        "task.generate_brief.start",
+        task_id=self.request.id,
+        idea_id=idea_id,
+    )
+
+    try:
+        from app.agents.brief_engine import BriefEngine
+
+        db = None
+        try:
+            from app.database import SessionLocal
+            db = SessionLocal()
+        except Exception:
+            pass
+
+        try:
+            engine = BriefEngine(db=db)
+            record = engine.generate(idea_id=idea_id)
+
+            log.info(
+                "task.generate_brief.complete",
+                task_id=self.request.id,
+                idea_id=idea_id,
+                brief_id=record.brief_id,
+            )
+
+            return {
+                "status": "brief_generated",
+                "idea_id": idea_id,
+                "brief_id": record.brief_id,
+            }
+
+        finally:
+            if db is not None:
+                db.close()
+
+    except Exception as exc:
+        log.error(
+            "task.generate_brief.failed",
+            task_id=self.request.id,
+            idea_id=idea_id,
+            error=str(exc),
+            retries=self.request.retries,
+        )
+        retry_delays = [30, 90]
+        delay = retry_delays[min(self.request.retries, len(retry_delays) - 1)]
+        raise self.retry(exc=exc, countdown=delay)

@@ -314,15 +314,25 @@ class BriefEngine:
                 "content_type": "image_post",
             }
 
-        row = self._db.execute(
-            "SELECT * FROM ideas WHERE idea_id = :idea_id",
-            {"idea_id": idea_id},
-        ).fetchone()
+        from app.models.idea import Idea
+        row = self._db.query(Idea).filter(Idea.idea_id == idea_id).first()
 
         if row is None:
             raise IdeaNotFoundError(f"Idee '{idea_id}' nicht in DB gefunden.")
 
-        return dict(row)
+        return {
+            "idea_id": row.idea_id,
+            "hook": row.hook,
+            "emotion": row.core_emotion,
+            "target_group": row.target_group,
+            "platform": row.best_platforms.split(",")[0].strip() if row.best_platforms else "instagram",
+            "content_type": row.content_type,
+            "main_scene": row.main_scene,
+            "transformation": row.transformation,
+            "reveal": row.reveal,
+            "cta_style": row.cta_style,
+            "short_description": row.short_description,
+        }
 
     def _generate_with_retry(
         self,
