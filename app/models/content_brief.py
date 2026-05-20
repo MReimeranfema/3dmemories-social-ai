@@ -158,7 +158,7 @@ class ContentBriefRecord(BaseModel):
     ab_variant:           str | None
 
     brief_json:    dict[str, Any]
-    change_log:    list[dict[str, Any]]
+    change_log:    list[dict[str, Any]] = Field(default_factory=list)
 
     # Denormalisierte Felder
     hook:                  str | None
@@ -182,8 +182,8 @@ class ContentBriefRecord(BaseModel):
     validation_status:    str
     validation_score:     float | None
     validation_notes:     str | None
-    validation_errors:    list[dict]
-    validation_warnings:  list[dict]
+    validation_errors:    list[dict] = Field(default_factory=list)
+    validation_warnings:  list[dict] = Field(default_factory=list)
     validated_by:         str | None
     validated_at:         datetime | None
 
