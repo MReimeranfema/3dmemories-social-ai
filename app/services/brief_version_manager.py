@@ -148,9 +148,8 @@ class BriefVersionManager:
 
         # Produktions-Pfad: atomare Transaktion
         try:
-            with self._db.begin():
-                # Schritt 1: Aktuelle Version laden + locken
-                current = self._load_latest_for_update(req.brief_id)
+            # Schritt 1: Aktuelle Version laden + locken
+            current = self._load_latest_for_update(req.brief_id)
 
                 # Schritt 2: FINAL-Check
                 if current["is_final"]:
@@ -261,6 +260,8 @@ class BriefVersionManager:
                     timestamp=now,
                 )
 
+            self._db.commit()
+
             log.info(
                 "brief_version.create.complete",
                 brief_id=req.brief_id,
@@ -312,7 +313,7 @@ class BriefVersionManager:
             event="BRIEF_CREATED",
         )
 
-        with self._db.begin():
+        try:
             self._db.execute(
                 self._INSERT_SQL,
                 {
@@ -365,6 +366,13 @@ class BriefVersionManager:
                 rollback_source_uuid=None,
                 created_at=now,
             )
+
+            self._db.commit()
+
+        except Exception as exc:
+            self._db.rollback()
+            log.error("brief_version.initial.failed", brief_id=brief_id, error=str(exc))
+            raise
 
         log.info("brief_version.initial.complete", brief_id=brief_id, brief_uuid=str(new_uuid))
         return self._load_record(str(new_uuid))
