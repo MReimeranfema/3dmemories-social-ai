@@ -3,11 +3,12 @@
 Revision ID: 0002
 Revises: 0001
 Create Date: 2026-05-20
+
+Idempotent: nutzt IF NOT EXISTS für alle Operationen.
 """
 
 from alembic import op
-import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
+from sqlalchemy import text
 
 revision = "0002"
 down_revision = "0001"
@@ -16,82 +17,90 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # ── content_briefs ────────────────────────────────────────────────────────
-    op.create_table(
-        "content_briefs",
-        sa.Column("brief_uuid", sa.String(36), primary_key=True),
-        sa.Column("brief_id", sa.String(30), nullable=False, index=True),
-        sa.Column("version", sa.Integer, nullable=False, default=1),
-        sa.Column("parent_version_id", sa.String(36), nullable=True),
-        sa.Column("rollback_source_uuid", sa.String(36), nullable=True),
-        sa.Column("is_latest_version", sa.Boolean, nullable=False, default=True),
-        sa.Column("is_superseded", sa.Boolean, nullable=False, default=False),
-        sa.Column("is_final", sa.Boolean, nullable=False, default=False),
-        sa.Column("is_deleted", sa.Boolean, nullable=False, default=False),
-        sa.Column("ab_variant", sa.String(10), nullable=True),
-        sa.Column("brief_json", postgresql.JSONB, nullable=False),
-        sa.Column("change_log", postgresql.JSONB, nullable=True),
-        # Denormalisierte Felder
-        sa.Column("idea_id", sa.String(20), nullable=True),
-        sa.Column("platform", sa.String(30), nullable=True),
-        sa.Column("hook", sa.Text, nullable=True),
-        sa.Column("primary_emotion", sa.String(50), nullable=True),
-        sa.Column("story_structure", sa.String(50), nullable=True),
-        sa.Column("scene_count", sa.Integer, nullable=True),
-        sa.Column("duration_sec", sa.Integer, nullable=True),
-        sa.Column("visual_style", sa.Text, nullable=True),
-        sa.Column("camera_style", sa.Text, nullable=True),
-        sa.Column("audio_style", sa.String(50), nullable=True),
-        sa.Column("cta_style", sa.String(50), nullable=True),
-        sa.Column("platform_format", postgresql.JSONB, nullable=True),
-        sa.Column("production_complexity", sa.Integer, nullable=True),
-        sa.Column("production_risk", sa.Integer, nullable=True),
-        # Status
-        sa.Column("validation_status", sa.String(30), nullable=True, default="pending"),
-        sa.Column("approval_status", sa.String(30), nullable=True, default="PENDING_VALIDATION"),
-        sa.Column("production_blocked", sa.Boolean, nullable=False, default=True),
-        # Metadaten
-        sa.Column("revision_reason", sa.Text, nullable=True),
-        sa.Column("compliance_note", sa.Text, nullable=True),
-        sa.Column("schema_version", sa.String(10), nullable=True, default="1.0.0"),
-        sa.Column("created_by_agent", sa.String(50), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=True),
-    )
+    conn = op.get_bind()
 
-    op.create_index("ix_content_briefs_brief_id", "content_briefs", ["brief_id"])
-    op.create_index("ix_content_briefs_idea_id", "content_briefs", ["idea_id"])
-    op.create_index(
-        "ix_content_briefs_latest",
-        "content_briefs",
-        ["brief_id", "is_latest_version"],
-    )
+    # ── content_briefs ────────────────────────────────────────────────────────
+    conn.execute(text("""
+        CREATE TABLE IF NOT EXISTS content_briefs (
+            brief_uuid              VARCHAR(36)     PRIMARY KEY,
+            brief_id                VARCHAR(30)     NOT NULL,
+            version                 INTEGER         NOT NULL DEFAULT 1,
+            parent_version_id       VARCHAR(36),
+            rollback_source_uuid    VARCHAR(36),
+            is_latest_version       BOOLEAN         NOT NULL DEFAULT TRUE,
+            is_superseded           BOOLEAN         NOT NULL DEFAULT FALSE,
+            is_final                BOOLEAN         NOT NULL DEFAULT FALSE,
+            is_deleted              BOOLEAN         NOT NULL DEFAULT FALSE,
+            ab_variant              VARCHAR(10),
+            brief_json              JSONB           NOT NULL,
+            change_log              JSONB,
+            idea_id                 VARCHAR(20),
+            platform                VARCHAR(30),
+            hook                    TEXT,
+            primary_emotion         VARCHAR(50),
+            story_structure         VARCHAR(50),
+            scene_count             INTEGER,
+            duration_sec            INTEGER,
+            visual_style            TEXT,
+            camera_style            TEXT,
+            audio_style             VARCHAR(50),
+            cta_style               VARCHAR(50),
+            platform_format         JSONB,
+            production_complexity   INTEGER,
+            production_risk         INTEGER,
+            validation_status       VARCHAR(30)     DEFAULT 'pending',
+            approval_status         VARCHAR(30)     DEFAULT 'PENDING_VALIDATION',
+            production_blocked      BOOLEAN         NOT NULL DEFAULT TRUE,
+            revision_reason         TEXT,
+            compliance_note         TEXT,
+            schema_version          VARCHAR(10)     DEFAULT '1.0.0',
+            created_by_agent        VARCHAR(50),
+            created_at              TIMESTAMPTZ,
+            updated_at              TIMESTAMPTZ
+        )
+    """))
+
+    conn.execute(text("""
+        CREATE INDEX IF NOT EXISTS ix_content_briefs_brief_id
+        ON content_briefs (brief_id)
+    """))
+
+    conn.execute(text("""
+        CREATE INDEX IF NOT EXISTS ix_content_briefs_idea_id
+        ON content_briefs (idea_id)
+    """))
+
+    conn.execute(text("""
+        CREATE INDEX IF NOT EXISTS ix_content_briefs_latest
+        ON content_briefs (brief_id, is_latest_version)
+    """))
 
     # ── content_brief_change_log ──────────────────────────────────────────────
-    op.create_table(
-        "content_brief_change_log",
-        sa.Column("log_uuid", sa.String(36), primary_key=True),
-        sa.Column("brief_id", sa.String(30), nullable=False, index=True),
-        sa.Column("from_version", sa.Integer, nullable=True),
-        sa.Column("to_version", sa.Integer, nullable=False),
-        sa.Column("from_uuid", sa.String(36), nullable=True),
-        sa.Column("to_uuid", sa.String(36), nullable=False),
-        sa.Column("event_type", sa.String(30), nullable=True),
-        sa.Column("trigger_code", sa.String(50), nullable=True),
-        sa.Column("trigger_reason", sa.Text, nullable=True),
-        sa.Column("actor", sa.String(50), nullable=True),
-        sa.Column("diff_json", postgresql.JSONB, nullable=True),
-        sa.Column("rollback_source_uuid", sa.String(36), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=True),
-    )
+    conn.execute(text("""
+        CREATE TABLE IF NOT EXISTS content_brief_change_log (
+            log_uuid                VARCHAR(36)     PRIMARY KEY,
+            brief_id                VARCHAR(30)     NOT NULL,
+            from_version            INTEGER,
+            to_version              INTEGER         NOT NULL,
+            from_uuid               VARCHAR(36),
+            to_uuid                 VARCHAR(36)     NOT NULL,
+            event_type              VARCHAR(30),
+            trigger_code            VARCHAR(50),
+            trigger_reason          TEXT,
+            actor                   VARCHAR(50),
+            diff_json               JSONB,
+            rollback_source_uuid    VARCHAR(36),
+            created_at              TIMESTAMPTZ
+        )
+    """))
 
-    op.create_index(
-        "ix_content_brief_change_log_brief_id",
-        "content_brief_change_log",
-        ["brief_id"],
-    )
+    conn.execute(text("""
+        CREATE INDEX IF NOT EXISTS ix_content_brief_change_log_brief_id
+        ON content_brief_change_log (brief_id)
+    """))
 
 
 def downgrade() -> None:
-    op.drop_table("content_brief_change_log")
-    op.drop_table("content_briefs")
+    conn = op.get_bind()
+    conn.execute(text("DROP TABLE IF EXISTS content_brief_change_log"))
+    conn.execute(text("DROP TABLE IF EXISTS content_briefs"))
